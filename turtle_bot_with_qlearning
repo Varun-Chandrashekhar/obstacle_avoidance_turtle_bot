@@ -1,0 +1,119 @@
+# V3 grid with q learning is very slow doesn’t work well:
+import turtle
+import numpy as np
+import random
+
+# Initialize the screen
+screen = turtle.Screen()
+screen.setup(width=600, height=600)
+screen.title("Q-learning Turtle Navigation on 20x20 Grid")
+
+# Parameters
+n_rows, n_cols = 20, 20
+cell_size = 30
+start_zone = (0, 0)
+end_zone = (n_rows - 1, n_cols - 1)
+actions = ["up", "down", "left", "right"]
+learning_rate = 0.1
+discount_factor = 0.9
+exploration_rate = 0.2  # Increased exploration rate for larger grid
+num_episodes = 50  # May need to increase for sufficient learning
+
+# Q-table
+q_table = np.zeros((n_rows, n_cols, len(actions)))
+
+# Create drawing turtle for grid and zones
+drawer = turtle.Turtle()
+drawer.hideturtle()
+drawer.speed(0)  # fastest speed
+drawer.penup()
+
+# Draw grid and zones
+def setup_grid():
+    drawer.penup()
+    for row in range(n_rows):
+        for col in range(n_cols):
+            x, y = col * cell_size - 250, 250 - row * cell_size
+            drawer.goto(x, y)
+            drawer.pendown()
+            drawer.setheading(0)
+            for _ in range(4):
+                drawer.forward(cell_size)
+                drawer.left(90)
+            drawer.penup()
+    # Start zone
+    drawer.fillcolor("green")
+    drawer.goto(-250, 250)
+    drawer.begin_fill()
+    for _ in range(4):
+        drawer.forward(cell_size)
+        drawer.left(90)
+    drawer.end_fill()
+    # End zone
+    drawer.fillcolor("red")
+    drawer.goto(250-cell_size, -250 + cell_size*(n_rows-1))
+    drawer.begin_fill()
+    for _ in range(4):
+        drawer.forward(cell_size)
+        drawer.left(90)
+    drawer.end_fill()
+
+setup_grid()
+
+# Turtle setup for visualization
+turtles = [turtle.Turtle(shape="turtle") for _ in range(num_episodes)]
+for i, t in enumerate(turtles):
+    t.color((i / num_episodes, 0.5, 1 - i / num_episodes))  # Color gradient
+    t.penup()
+    t.shapesize(0.5)  # Smaller turtle for dense grid
+
+def get_state_pos(state):
+    """Convert state index to pixel coordinates."""
+    return (state[1] * cell_size - 250 + cell_size // 2, 250 - state[0] * cell_size - cell_size // 2)
+
+def step(state, action):
+    """Take action in the environment and return new state, reward, and done."""
+    i, j = state
+    if action == "up" and i > 0:
+        i -= 1
+    elif action == "down" and i < n_rows - 1:
+        i += 1
+    elif action == "left" and j > 0:
+        j -= 1
+    elif action == "right" and j < n_cols - 1:
+        j += 1
+    new_state = (i, j)
+    reward = -1  # Penalty for each move
+    if new_state == end_zone:
+        reward = 100  # Reward for reaching the target
+    return new_state, reward, new_state == end_zone
+
+def update_q_table(state, action_index, reward, next_state):
+    """Update Q-table using the Q-learning algorithm."""
+    current_q = q_table[state][action_index]
+    max_future_q = np.max(q_table[next_state])
+    new_q = (1 - learning_rate) * current_q + learning_rate * (reward + discount_factor * max_future_q)
+    q_table[state][action_index] = new_q
+
+def choose_action(state, explore=True):
+    """Choose an action based on the current state and exploration rate."""
+    if explore and random.random() < exploration_rate:
+        return random.choice(actions)
+    else:
+        action_index = np.argmax(q_table[state])
+        return actions[action_index]
+
+# Training the model with visualization
+for episode in range(num_episodes):
+    state = start_zone
+    done = False
+    turtles[episode].goto(get_state_pos(state))
+    turtles[episode].pendown()
+    while not done:
+        action_index = actions.index(choose_action(state))
+        next_state, reward, done = step(state, actions[action_index])
+        update_q_table(state, action_index, reward, next_state)
+        state = next_state
+        turtles[episode].goto(get_state_pos(state))
+
+screen.mainloop()
