@@ -1,0 +1,154 @@
+# V5 Working A* with obstacles:
+# A star navigation with obstacles
+# bug: obstacles are generated in the wrong ranges
+
+import turtle
+import heapq
+import random
+
+# Initialize the screen
+screen = turtle.Screen()
+screen.setup(width=600, height=600)
+screen.title("A* Turtle Navigation with Obstacles")
+
+# Create the drawing turtle for zones and obstacles
+drawer = turtle.Turtle()
+drawer.penup()
+drawer.speed(0)  # fastest speed
+
+# Draw start and target zones
+def draw_zone(x, y, color):
+    drawer.goto(x, y)
+    drawer.fillcolor(color)
+    drawer.begin_fill()
+    for _ in range(4):
+        drawer.forward(50)
+        drawer.left(90)
+    drawer.end_fill()
+
+draw_zone(-275, -275, "green")  # Start zone
+draw_zone(225, 225, "red")  # Target zone
+
+# Create the turtle for pathfinding
+t = turtle.Turtle()
+t.shape("turtle")
+t.color("blue")
+t.speed(1)
+t.penup()
+t.goto(-250, -250)  # Start position, centered in the start zone
+t.pendown()
+
+# A* Algorithm Setup
+class Node:
+    def __init__(self, x, y, parent=None):
+        self.x = x
+        self.y = y
+        self.parent = parent
+        self.g = 0  # Cost from start to current node
+        self.h = 0  # Estimated cost from current to end
+        self.f = 0  # Total cost
+
+    def __lt__(self, other):
+        return self.f < other.f
+
+def heuristic(x1, y1, x2, y2):
+    # Using Manhattan distance as heuristic
+    return abs(x1 - x2) + abs(y1 - y2)
+
+def draw_obstacles(number_of_obstacles):
+    obstacles = set()
+    drawer.penup()  # Lift the pen up
+    while len(obstacles) < number_of_obstacles:
+        x = random.randint(0, 9)  # Adjust range according to grid size
+        y = random.randint(0, 9)
+        if (x, y) not in [(0, 0), (9, 9)]:  # Avoid placing on start or target
+            obstacles.add((x, y))
+            drawer.goto(x * 50 - 250, y * 50 - 250)  # Convert to pixel coordinates
+            drawer.pendown()  # Put the pen down to start drawing
+            drawer.fillcolor("black")
+            drawer.begin_fill()
+            for _ in range(4):
+                drawer.forward(50)
+                drawer.left(90)
+            drawer.end_fill()
+            drawer.penup()  # Lift the pen up to move to the next position
+    return obstacles
+
+
+
+
+def create_grid():
+    # Draw grid lines
+    for i in range(-250, 301, 50):
+        drawer.penup()
+        drawer.goto(i, -250)
+        drawer.pendown()
+        drawer.goto(i, 250)
+
+        drawer.penup()
+        drawer.goto(-250, i)
+        drawer.pendown()
+        drawer.goto(250, i)
+
+def get_index(x, y):
+    # Get grid index from coordinates
+    return (x + 250) // 50, (y + 250) // 50
+
+def a_star(start, end, obstacles):
+    # Open and closed sets
+    open_set = []
+    closed_set = set()
+    start_node = Node(*get_index(*start))
+    end_node = Node(*get_index(*end))
+    heapq.heappush(open_set, (start_node.f, start_node))
+    open_set_tracker = {get_index(*start): start_node}
+
+    while open_set:
+        current_node = heapq.heappop(open_set)[1]
+
+        if (current_node.x, current_node.y) in closed_set:
+            continue
+
+        closed_set.add((current_node.x, current_node.y))
+
+        if current_node.x == end_node.x and current_node.y == end_node.y:
+            path = []
+            while current_node:
+                path.append((current_node.x, current_node.y))
+                current_node = current_node.parent
+            return path[::-1]
+
+        # Generate children
+        for new_position in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+            node_position = (current_node.x + new_position[0], current_node.y + new_position[1])
+            if node_position in closed_set or node_position in obstacles:
+                continue
+
+            node = Node(*node_position, parent=current_node)
+            node.g = current_node.g + 1
+            node.h = heuristic(node.x, node.y, end_node.x, end_node.y)
+            node.f = node.g + node.h
+
+            if node_position not in open_set_tracker or node.f < open_set_tracker[node_position].f:
+                heapq.heappush(open_set, (node.f, node))
+                open_set_tracker[node_position] = node
+
+    return None
+
+# Draw the grid
+create_grid()
+
+# Draw and handle obstacles
+obstacles = draw_obstacles(20)  # You can change the number of obstacles
+
+# Pathfinding from start to end with obstacles
+path = a_star((-250, -250), (250, 250), obstacles)
+if path:
+    for x, y in path:
+        t.goto(x * 50 - 250, y * 50 - 250)  # Move to each step in the path
+else:
+    print("No path found")
+
+drawer.hideturtle()
+t.hideturtle()
+screen.mainloop()
