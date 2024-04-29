@@ -1,0 +1,141 @@
+#V6:
+#Implemented with Q learning however it get Stuck in a loop 
+import turtle
+import random
+import numpy as np
+
+# Initialize the screen
+screen = turtle.Screen()
+screen.setup(width=600, height=600)
+screen.title("RL Turtle Navigation with Obstacles")
+
+# Create the drawing turtle for zones, obstacles, and grid
+drawer = turtle.Turtle()
+drawer.speed(0)
+drawer.penup()
+
+# Define actions globally
+actions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
+
+# Draw zones and grid
+def setup_environment():
+    # Draw start and target zones
+    drawer.fillcolor("green")
+    drawer.goto(-275, -275)
+    drawer.begin_fill()
+    for _ in range(4):
+        drawer.forward(50)
+        drawer.left(90)
+    drawer.end_fill()
+    
+    drawer.fillcolor("red")
+    drawer.goto(225, 225)
+    drawer.begin_fill()
+    for _ in range(4):
+        drawer.forward(50)
+        drawer.left(90)
+    drawer.end_fill()
+
+    # Draw grid lines
+    for i in range(-250, 301, 50):
+        drawer.goto(i, -250)
+        drawer.pendown()
+        drawer.goto(i, 250)
+        drawer.penup()
+        drawer.goto(-250, i)
+        drawer.pendown()
+        drawer.goto(250, i)
+        drawer.penup()
+
+# Create obstacles
+def create_obstacles():
+    obstacles = set()
+    while len(obstacles) < 20:
+        x, y = random.randint(0, 9), random.randint(0, 9)
+        if (x, y) not in [(0, 0), (9, 9)]:
+            obstacles.add((x, y))
+            drawer.goto(x * 50 - 250, y * 50 - 250)
+            drawer.pendown()
+            drawer.fillcolor("black")
+            drawer.begin_fill()
+            for _ in range(4):
+                drawer.forward(50)
+                drawer.left(90)
+            drawer.end_fill()
+            drawer.penup()
+    return obstacles
+
+# Q-learning setup and execution
+def q_learning(obstacles, turtle):
+    grid_size = 10
+    q_values = np.zeros((grid_size, grid_size, 4))
+    epochs = 100
+    learning_rate = 0.1
+    discount_factor = 0.9
+    initial_epsilon = 0.9
+    epsilon_decay = 0.99
+    move_penalty = -1
+
+    for epoch in range(epochs):
+        x, y = 0, 0
+        epsilon = initial_epsilon * (epsilon_decay ** epoch)
+        state_history = []  # Track visited states
+
+        while (x, y) != (9, 9):
+            state_history.append((x, y))
+
+            if random.random() < epsilon:
+                action_index = random.randint(0, 3)
+            else:
+                action_index = np.argmax(q_values[x, y])
+
+            action = actions[action_index]
+            new_x, new_y = x + action[0], y + action[1]
+
+            if (new_x, new_y) in obstacles or not (0 <= new_x < grid_size and 0 <= new_y < grid_size):
+                reward = -100
+                new_x, new_y = x, y
+            elif (new_x, new_y) == (9, 9):
+                reward = 1000
+            else:
+                reward = move_penalty
+
+            old_value = q_values[x, y, action_index]
+            future_optimal_value = np.max(q_values[new_x, new_y])
+            q_values[x, y, action_index] = old_value + learning_rate * (reward + discount_factor * future_optimal_value - old_value)
+
+            x, y = new_x, new_y
+
+            # Check for loop
+            if len(state_history) > 5 and state_history[-1] == state_history[-3]:
+                break
+
+        if epoch % 10 == 0:
+            draw_path(q_values, turtle)
+
+
+# Draw the path based on Q-values
+def draw_path(q_values, turtle):
+    x, y = 0, 0
+    turtle.goto(-250, -250)
+    turtle.pendown()
+    while (x, y) != (9, 9):
+        action_index = np.argmax(q_values[x, y])
+        action = actions[action_index]
+        x, y = x + action[0], y + action[1]
+        turtle.goto(x * 50 - 250, y * 50 - 250)
+    turtle.penup()
+
+# Set up the environment and run Q-learning
+setup_environment()
+obstacles = create_obstacles()
+pathfinder = turtle.Turtle()
+pathfinder.shape("turtle")
+pathfinder.color("blue")
+pathfinder.speed(1)
+pathfinder.penup()
+q_learning(obstacles, pathfinder)
+
+drawer.hideturtle()
+pathfinder.hideturtle()
+screen.mainloop()
